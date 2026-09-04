@@ -210,8 +210,8 @@
   });
   draw();
 
-  /* ---------------- the way in ----------------
-     Six digits of pi, then the positions of A and I in the alphabet. */
+  /* ---------------- entry sequence ----------------
+     Fixed sequence check. */
   var SECRET = ['31415919', '3.1415919'];
   function checkSecret() {
     if (SECRET.indexOf(cur) < 0) return false;
@@ -287,11 +287,9 @@
     });
   });
 
-  /* The calculator is always what opens. Every visit starts here, even when the
-     passphrase is already remembered — otherwise anyone reopening the app would
-     land straight in the war room, which defeats the point of the cover.
-     The remembered passphrase is still used, just after the code is entered,
-     so getting in stays a single sequence with nothing to retype. */
+  /* Every visit starts on this screen, including when a passphrase is already
+     stored. The stored value is applied after the entry sequence, so nothing
+     has to be typed twice. */
 })();
 </script>
 </body>
