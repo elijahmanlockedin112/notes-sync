@@ -268,9 +268,11 @@
     });
     return envP;
   }
+  // Spaces and capitals are ignored, so every way of typing it opens the same door.
+  function normPass(p) { return String(p).toLowerCase().replace(/\s+/g, ''); }
   function unlock(pass, remember) {
     return swReady.then(payload).then(function (env) {
-      return crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey'])
+      return crypto.subtle.importKey('raw', new TextEncoder().encode(normPass(pass)), 'PBKDF2', false, ['deriveKey'])
         .then(function (km) {
           return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: ub64(env.salt), iterations: env.iter, hash: 'SHA-256' },
             km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
