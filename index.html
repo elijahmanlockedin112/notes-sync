@@ -36,9 +36,9 @@
   .pad .wide { aspect-ratio:auto; grid-column:span 2; border-radius:2.2rem; }
   button:focus-visible { outline:2px solid var(--amber); outline-offset:2px; }
 
-  /* ---------- vault ---------- */
-  .vault { position:fixed; inset:0; background:#0B0D10; display:none; place-items:center; z-index:20; }
-  .vault.on { display:grid; }
+  /* ---------- panel ---------- */
+  .pnl { position:fixed; inset:0; background:#0B0D10; display:none; place-items:center; z-index:20; }
+  .pnl.on { display:grid; }
   .stage { position:relative; width:min(78vw,22rem); aspect-ratio:1/1; perspective:1100px; }
   .glow { position:absolute; inset:-30%; border-radius:50%; opacity:0;
           background:radial-gradient(circle, rgba(240,178,65,.95) 0%, rgba(240,178,65,.35) 35%, transparent 70%); }
@@ -49,7 +49,7 @@
   /* Every animated element is a plain div. CSS animations on SVG child
      elements are unreliable on older WebKit, so the SVGs only ever draw. */
   .plate, .bolts, .handle { position:absolute; inset:0; }
-  .vault svg { position:absolute; inset:0; width:100%; height:100%; }
+  .pnl svg { position:absolute; inset:0; width:100%; height:100%; }
   .cap { position:absolute; left:0; right:0; bottom:-3.2rem; text-align:center; font-size:.9rem; color:#6E737B; opacity:0; }
 
   @keyframes spin  { to { transform:rotate(1080deg); } }
@@ -111,7 +111,7 @@
   </div>
 </div>
 
-<div class="vault" id="vault">
+<div class="pnl" id="pnl">
   <div class="stage" id="stage">
     <div class="glow"></div>
     <div class="beam"></div>
@@ -190,7 +190,7 @@
       prevVal = (op && !fresh) ? apply(prevVal, v, op) : v;
       cur = fmt(prevVal); op = k; fresh = true;
     } else if (k === '=') {
-      if (checkSecret()) return;
+      verify(cur);
       if (op) { cur = fmt(apply(prevVal, parseFloat(cur), op)); op = null; prevVal = null; }
       fresh = true;
     }
@@ -210,27 +210,36 @@
   });
   draw();
 
-  /* ---------------- entry sequence ----------------
-     Fixed sequence check. */
-  var SECRET = ['31415919', '3.1415919'];
-  function checkSecret() {
-    if (SECRET.indexOf(cur) < 0) return false;
-    cur = '0'; prevVal = null; op = null; fresh = true; draw();
-    openVault();
-    return true;
+  /* Stored as digests, not values, so reading this file reveals nothing. */
+  var KEYS = [
+    'd58012d1aa0129588c1b42cb2c4bd0d456cd382701cbea893a3a13157101dba5',
+    '78bba1a94471812f5b43247c97b22a3cf1058b217619fb96ba6c1510f6b16d27'
+  ];
+  var digestOk = !!(window.crypto && window.crypto.subtle && crypto.subtle.digest);
+  function verify(v) {
+    if (!digestOk || !v) return;
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)).then(function (buf) {
+      var hex = Array.prototype.map.call(new Uint8Array(buf), function (b) {
+        return ('0' + b.toString(16)).slice(-2);
+      }).join('');
+      if (KEYS.indexOf(hex) > -1) {
+        cur = '0'; prevVal = null; op = null; fresh = true; draw();
+        openPanel();
+      }
+    }).catch(function () {});
   }
 
   var opened = false;
-  function openVault() {
+  function openPanel() {
     if (opened) return; opened = true;
-    $('vault').classList.add('on');
+    $('pnl').classList.add('on');
     // A timer rather than requestAnimationFrame: rAF gets throttled in
     // background tabs and low-power mode, which would leave the door frozen.
     setTimeout(function () { $('stage').classList.add('go'); $('white').classList.add('go'); }, 30);
     var wait = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 3050;
-    setTimeout(afterVault, wait);
+    setTimeout(afterPanel, wait);
   }
-  function afterVault() {
+  function afterPanel() {
     var saved = null;
     try { saved = localStorage.getItem(K); } catch (e) {}
     if (saved) {
@@ -242,16 +251,13 @@
   }
   function showGate() {
     $('white').style.animation = 'none'; $('white').style.opacity = 0;
-    $('vault').classList.remove('on');
+    $('pnl').classList.remove('on');
     $('gate').classList.add('on');
     setTimeout(function () { $('p').focus(); }, 50);
   }
 
-  /* ---------------- unlock ---------------- */
-  if (!(window.crypto && window.crypto.subtle)) {
-    // Without a secure context there is nothing to open; stay a calculator.
-    SECRET = [];
-  }
+  /* Without a secure context nothing further is available. */
+  if (!(window.crypto && window.crypto.subtle)) { KEYS = []; }
   var swReady = ('serviceWorker' in navigator)
     ? navigator.serviceWorker.register('./sw.js').catch(function () {})
     : Promise.resolve();

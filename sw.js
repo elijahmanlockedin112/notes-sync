@@ -1,4 +1,4 @@
-const CACHE = 'c-mtnez1e1';
+const CACHE = 'c-mtnf2sdh';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png', './app.enc'];
 
 self.addEventListener('install', (e) => {
