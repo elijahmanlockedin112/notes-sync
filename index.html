@@ -12,69 +12,264 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Calculator">
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { margin:0; min-height:100dvh; display:grid; place-items:center; background:#14161A; color:#E8E6E1;
-         font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding:1.2rem; }
-  .box { width:100%; max-width:22rem; }
-  h1 { font-size:1rem; font-weight:600; margin:0 0 1rem; color:#A3A7AE; letter-spacing:.02em; }
-  input { width:100%; padding:.75rem .85rem; font-size:1rem; color:#E8E6E1; background:#1C1F25;
-          border:1px solid #2C313A; border-radius:6px; }
-  input:focus { outline:2px solid #F0B241; outline-offset:1px; }
-  button { width:100%; margin-top:.6rem; padding:.75rem 1rem; font-size:1rem; font-weight:600; cursor:pointer;
-           color:#1A1200; background:#F0B241; border:0; border-radius:6px; }
-  button:disabled { opacity:.6; cursor:default; }
-  label { display:flex; gap:.5rem; align-items:center; margin-top:.7rem; font-size:.85rem; color:#6E737B; }
+  :root { color-scheme: dark; --bg:#14161A; --ink:#E8E6E1; --key:#2A2F37; --key2:#3A414B; --amber:#F0B241; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); overflow:hidden;
+         font:16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+  /* ---------- calculator ---------- */
+  .calc { height:100dvh; max-width:26rem; margin:0 auto; padding:1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+          display:flex; flex-direction:column; }
+  .out { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:flex-end;
+         padding:0 .5rem 1rem; min-height:0; }
+  .prev { font-size:1.05rem; color:#8A9099; min-height:1.4em; font-variant-numeric:tabular-nums;
+          overflow:hidden; text-overflow:ellipsis; max-width:100%; white-space:nowrap; }
+  .disp { font-size:clamp(2.6rem, 15vw, 4rem); font-weight:300; letter-spacing:-.02em; line-height:1.1;
+          font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; max-width:100%; white-space:nowrap; }
+  .pad { display:grid; grid-template-columns:repeat(4,1fr); gap:.7rem; }
+  .pad button { aspect-ratio:1/1; border:0; border-radius:50%; background:var(--key); color:var(--ink);
+                font-size:clamp(1.3rem,6vw,1.7rem); font-weight:400; cursor:pointer; transition:filter .12s; }
+  .pad button:active { filter:brightness(1.45); }
+  .pad .fn { background:var(--key2); }
+  .pad .op { background:var(--amber); color:#1A1200; font-weight:600; }
+  .pad .wide { aspect-ratio:auto; grid-column:span 2; border-radius:2.2rem; }
+  button:focus-visible { outline:2px solid var(--amber); outline-offset:2px; }
+
+  /* ---------- vault ---------- */
+  .vault { position:fixed; inset:0; background:#0B0D10; display:none; place-items:center; z-index:20; }
+  .vault.on { display:grid; }
+  .stage { position:relative; width:min(78vw,22rem); aspect-ratio:1/1; perspective:1100px; }
+  .glow { position:absolute; inset:-30%; border-radius:50%; opacity:0;
+          background:radial-gradient(circle, rgba(240,178,65,.95) 0%, rgba(240,178,65,.35) 35%, transparent 70%); }
+  .door { position:absolute; inset:0; transform-origin:left center; transform-style:preserve-3d; }
+  .beam { position:absolute; inset:0; opacity:0; background:
+          conic-gradient(from 200deg at 50% 50%, transparent 0deg, rgba(255,225,170,.55) 18deg, transparent 42deg,
+                         transparent 180deg, rgba(255,225,170,.45) 200deg, transparent 226deg); filter:blur(6px); }
+  /* Every animated element is a plain div. CSS animations on SVG child
+     elements are unreliable on older WebKit, so the SVGs only ever draw. */
+  .plate, .bolts, .handle { position:absolute; inset:0; }
+  .vault svg { position:absolute; inset:0; width:100%; height:100%; }
+  .cap { position:absolute; left:0; right:0; bottom:-3.2rem; text-align:center; font-size:.9rem; color:#6E737B; opacity:0; }
+
+  @keyframes spin  { to { transform:rotate(1080deg); } }
+  @keyframes bolts { to { transform:scale(.62); opacity:.55; } }
+  @keyframes swing { 0%{transform:rotateY(0)} 100%{transform:rotateY(-118deg) translateZ(30px)} }
+  @keyframes flare { 0%{opacity:0} 55%{opacity:1} 100%{opacity:.85} }
+  @keyframes rise  { to { opacity:1 } }
+  @keyframes wash  { 0%{opacity:0} 70%{opacity:1} 100%{opacity:1} }
+
+  .go .handle { animation:spin 1.15s cubic-bezier(.6,.05,.25,1) forwards; }
+  .go .bolts { animation:bolts .5s ease-in .95s forwards; }
+  .go .door { animation:swing 1.15s cubic-bezier(.5,0,.2,1) 1.35s forwards; }
+  .go .glow { animation:flare 1.5s ease-out 1.35s forwards; }
+  .go .beam { animation:rise 1.1s ease-out 1.6s forwards; }
+  .go .cap  { animation:rise .6s ease-out 2.3s forwards; }
+  .go .white { animation:wash .75s ease-in 2.5s forwards; }
+  .white { position:fixed; inset:0; background:#F7EBD4; opacity:0; pointer-events:none; z-index:25; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .go .handle,.go .bolts,.go .door,.go .glow,.go .beam,.go .cap { animation-duration:.01s; animation-delay:0s; }
+    .go .white { animation-duration:.01s; animation-delay:.05s; }
+  }
+
+  /* ---------- passphrase ---------- */
+  .gate { position:fixed; inset:0; background:var(--bg); display:none; place-items:center; padding:1.2rem; z-index:30; }
+  .gate.on { display:grid; }
+  .gate .box { width:100%; max-width:22rem; }
+  .gate h1 { font-size:1rem; font-weight:600; margin:0 0 1rem; color:#A3A7AE; }
+  .gate input[type=password] { width:100%; padding:.75rem .85rem; font-size:1rem; color:var(--ink);
+        background:#1C1F25; border:1px solid #2C313A; border-radius:6px; }
+  .gate button { width:100%; margin-top:.6rem; padding:.75rem 1rem; font-size:1rem; font-weight:600;
+        color:#1A1200; background:var(--amber); border:0; border-radius:6px; cursor:pointer; }
+  .gate label { display:flex; gap:.5rem; align-items:center; margin-top:.7rem; font-size:.85rem; color:#6E737B; }
   .msg { margin-top:.7rem; font-size:.85rem; min-height:1.2em; color:#6E737B; }
   .msg.err { color:#E5484D; }
 </style>
 </head>
 <body>
-<div class="box">
-  <h1>Locked</h1>
-  <form id="f" autocomplete="off">
-    <input id="p" type="password" placeholder="Passphrase" autocomplete="current-password" enterkeyhint="go" autofocus>
-    <label><input id="r" type="checkbox" style="width:auto" checked> Stay unlocked on this device</label>
-    <button id="b" type="submit">Unlock</button>
-  </form>
-  <div class="msg" id="m"></div>
+
+<div class="calc" id="calc">
+  <div class="out">
+    <div class="prev" id="prev"></div>
+    <div class="disp" id="disp">0</div>
+  </div>
+  <div class="pad" id="pad">
+    <button class="fn" data-k="C">AC</button>
+    <button class="fn" data-k="neg">+/−</button>
+    <button class="fn" data-k="pct">%</button>
+    <button class="op" data-k="/">÷</button>
+    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+    <button class="op" data-k="*">×</button>
+    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+    <button class="op" data-k="-">−</button>
+    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+    <button class="op" data-k="+">+</button>
+    <button class="wide" data-k="0">0</button>
+    <button data-k=".">.</button>
+    <button class="op" data-k="=">=</button>
+  </div>
 </div>
+
+<div class="vault" id="vault">
+  <div class="stage" id="stage">
+    <div class="glow"></div>
+    <div class="beam"></div>
+    <div class="door">
+      <div class="plate">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <defs>
+            <radialGradient id="steel" cx="38%" cy="32%">
+              <stop offset="0%" stop-color="#4A525D"/><stop offset="60%" stop-color="#333A44"/><stop offset="100%" stop-color="#20252C"/>
+            </radialGradient>
+          </defs>
+          <circle cx="100" cy="100" r="96" fill="url(#steel)" stroke="#565F6B" stroke-width="2"/>
+          <circle cx="100" cy="100" r="80" fill="none" stroke="#1B1F25" stroke-width="3"/>
+          <circle cx="100" cy="100" r="66" fill="none" stroke="#4A525D" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="bolts">
+        <svg viewBox="0 0 200 200" aria-hidden="true" fill="#6E7783">
+          <circle cx="100" cy="16" r="5"/><circle cx="159" cy="41" r="5"/><circle cx="184" cy="100" r="5"/>
+          <circle cx="159" cy="159" r="5"/><circle cx="100" cy="184" r="5"/><circle cx="41" cy="159" r="5"/>
+          <circle cx="16" cy="100" r="5"/><circle cx="41" cy="41" r="5"/>
+        </svg>
+      </div>
+      <div class="handle">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <circle cx="100" cy="100" r="15" fill="#5A6472" stroke="#8892A0" stroke-width="2"/>
+          <g stroke="#8892A0" stroke-width="7" stroke-linecap="round">
+            <line x1="100" y1="100" x2="100" y2="52"/><line x1="100" y1="100" x2="148" y2="100"/>
+            <line x1="100" y1="100" x2="100" y2="148"/><line x1="100" y1="100" x2="52" y2="100"/>
+          </g>
+          <circle cx="100" cy="100" r="7" fill="#F0B241"/>
+        </svg>
+      </div>
+    </div>
+    <div class="cap" id="cap">Opening</div>
+  </div>
+</div>
+<div class="white" id="white"></div>
+
+<div class="gate" id="gate">
+  <div class="box">
+    <h1>Passphrase</h1>
+    <form id="f" autocomplete="off">
+      <input id="p" type="password" placeholder="Passphrase" autocomplete="current-password" enterkeyhint="go">
+      <label><input id="r" type="checkbox" style="width:auto" checked> Stay unlocked on this device</label>
+      <button id="b" type="submit">Open</button>
+    </form>
+    <div class="msg" id="m"></div>
+  </div>
+</div>
+
 <script>
 (function () {
   var K = 'k.v1';
   var $ = function (id) { return document.getElementById(id); };
-  function msg(t, err) { var m = $('m'); m.textContent = t || ''; m.className = err ? 'msg err' : 'msg'; }
   function ub64(s) { return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); }); }
+  function msg(t, err) { var m = $('m'); m.textContent = t || ''; m.className = err ? 'msg err' : 'msg'; }
 
-  if (!(window.crypto && window.crypto.subtle)) {
-    msg('This page needs a secure connection (https).', true);
-    $('b').disabled = true;
-    return;
+  /* ---------------- calculator ---------------- */
+  var cur = '0', prevVal = null, op = null, fresh = true;
+  function fmt(n) {
+    if (!isFinite(n)) return 'Error';
+    var s = String(Math.round(n * 1e12) / 1e12);
+    return s.length > 14 ? Number(n).toPrecision(10).replace(/\.?0+e/, 'e') : s;
+  }
+  function draw() { $('disp').textContent = cur; $('prev').textContent = op ? (fmt(prevVal) + ' ' + ({ '+': '+', '-': '−', '*': '×', '/': '÷' })[op]) : ''; }
+  function apply(a, b, o) { return o === '+' ? a + b : o === '-' ? a - b : o === '*' ? a * b : b === 0 ? NaN : a / b; }
+  function press(k) {
+    if (k >= '0' && k <= '9') { cur = (fresh || cur === '0') ? k : cur + k; fresh = false; }
+    else if (k === '.') { if (fresh) { cur = '0.'; fresh = false; } else if (cur.indexOf('.') < 0) cur += '.'; }
+    else if (k === 'C') { cur = '0'; prevVal = null; op = null; fresh = true; }
+    else if (k === 'neg') { cur = cur.charAt(0) === '-' ? cur.slice(1) : (cur === '0' ? cur : '-' + cur); }
+    else if (k === 'pct') { cur = fmt(parseFloat(cur) / 100); fresh = true; }
+    else if (k === '+' || k === '-' || k === '*' || k === '/') {
+      var v = parseFloat(cur);
+      prevVal = (op && !fresh) ? apply(prevVal, v, op) : v;
+      cur = fmt(prevVal); op = k; fresh = true;
+    } else if (k === '=') {
+      if (checkSecret()) return;
+      if (op) { cur = fmt(apply(prevVal, parseFloat(cur), op)); op = null; prevVal = null; }
+      fresh = true;
+    }
+    draw();
+  }
+  $('pad').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-k]'); if (b) press(b.dataset.k);
+  });
+  document.addEventListener('keydown', function (e) {
+    if ($('gate').classList.contains('on')) return;
+    var k = e.key;
+    if (/^[0-9.]$/.test(k)) press(k);
+    else if (k === '+' || k === '-' || k === '*' || k === '/') press(k);
+    else if (k === 'Enter' || k === '=') { e.preventDefault(); press('='); }
+    else if (k === 'Escape') press('C');
+    else if (k === 'Backspace') { cur = cur.length > 1 ? cur.slice(0, -1) : '0'; if (cur === '-') cur = '0'; draw(); }
+  });
+  draw();
+
+  /* ---------------- the way in ----------------
+     Six digits of pi, then the positions of A and I in the alphabet. */
+  var SECRET = ['31415919', '3.1415919'];
+  function checkSecret() {
+    if (SECRET.indexOf(cur) < 0) return false;
+    cur = '0'; prevVal = null; op = null; fresh = true; draw();
+    openVault();
+    return true;
   }
 
-  // Register the worker BEFORE unlocking. document.write tears the document down,
-  // which cancels a registration still in flight, so wait for it to settle first.
+  var opened = false;
+  function openVault() {
+    if (opened) return; opened = true;
+    $('vault').classList.add('on');
+    // A timer rather than requestAnimationFrame: rAF gets throttled in
+    // background tabs and low-power mode, which would leave the door frozen.
+    setTimeout(function () { $('stage').classList.add('go'); $('white').classList.add('go'); }, 30);
+    var wait = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 3050;
+    setTimeout(afterVault, wait);
+  }
+  function afterVault() {
+    var saved = null;
+    try { saved = localStorage.getItem(K); } catch (e) {}
+    if (saved) {
+      unlock(saved, true).catch(function () {
+        try { localStorage.removeItem(K); } catch (e) {}
+        showGate();
+      });
+    } else showGate();
+  }
+  function showGate() {
+    $('white').style.animation = 'none'; $('white').style.opacity = 0;
+    $('vault').classList.remove('on');
+    $('gate').classList.add('on');
+    setTimeout(function () { $('p').focus(); }, 50);
+  }
+
+  /* ---------------- unlock ---------------- */
+  if (!(window.crypto && window.crypto.subtle)) {
+    // Without a secure context there is nothing to open; stay a calculator.
+    SECRET = [];
+  }
   var swReady = ('serviceWorker' in navigator)
     ? navigator.serviceWorker.register('./sw.js').catch(function () {})
     : Promise.resolve();
-
-  var envP = fetch('./app.enc', { cache: 'no-cache' }).then(function (r) {
-    if (!r.ok) throw new Error('missing payload');
-    return r.json();
-  });
-
+  var envP = null;
+  function payload() {
+    if (!envP) envP = fetch('./app.enc', { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error('missing'); return r.json();
+    });
+    return envP;
+  }
   function unlock(pass, remember) {
-    msg('Unlocking...');
-    return swReady.then(function () { return envP; }).then(function (env) {
+    return swReady.then(payload).then(function (env) {
       return crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey'])
         .then(function (km) {
-          return crypto.subtle.deriveKey(
-            { name: 'PBKDF2', salt: ub64(env.salt), iterations: env.iter, hash: 'SHA-256' },
+          return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: ub64(env.salt), iterations: env.iter, hash: 'SHA-256' },
             km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
         })
-        .then(function (key) {
-          return crypto.subtle.decrypt({ name: 'AES-GCM', iv: ub64(env.iv) }, key, ub64(env.ct));
-        })
+        .then(function (key) { return crypto.subtle.decrypt({ name: 'AES-GCM', iv: ub64(env.iv) }, key, ub64(env.ct)); })
         .then(function (buf) {
           var html = new TextDecoder().decode(buf);
           if (remember) { try { localStorage.setItem(K, pass); } catch (e) {} }
@@ -83,22 +278,25 @@
         });
     });
   }
-
   $('f').addEventListener('submit', function (e) {
     e.preventDefault();
-    var v = $('p').value;
-    if (!v) return;
-    $('b').disabled = true;
+    var v = $('p').value; if (!v) return;
+    $('b').disabled = true; msg('Opening...');
     unlock(v, $('r').checked).catch(function () {
-      msg('Incorrect.', true);
-      $('b').disabled = false;
-      $('p').select();
+      msg('Incorrect.', true); $('b').disabled = false; $('p').select();
     });
   });
 
+  /* Already unlocked on this device: skip the cover entirely. */
   var saved = null;
   try { saved = localStorage.getItem(K); } catch (e) {}
-  if (saved) unlock(saved, true).catch(function () { try { localStorage.removeItem(K); } catch (e) {} msg(''); });
+  if (saved) {
+    $('calc').style.visibility = 'hidden';
+    unlock(saved, true).catch(function () {
+      try { localStorage.removeItem(K); } catch (e) {}
+      $('calc').style.visibility = 'visible';
+    });
+  }
 })();
 </script>
 </body>
