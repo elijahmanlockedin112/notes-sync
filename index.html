@@ -210,10 +210,15 @@
   });
   draw();
 
-  /* Stored as digests, not values, so reading this file reveals nothing. */
-  var KEYS = [
-    'd58012d1aa0129588c1b42cb2c4bd0d456cd382701cbea893a3a13157101dba5',
-    '78bba1a94471812f5b43247c97b22a3cf1058b217619fb96ba6c1510f6b16d27'
+  /* Stored as digests, not values, so reading this file reveals nothing —
+     including which slot is which, since only an index is written down. The
+     final digit of the entry code selects the slot, so who you are is decided
+     before anything opens and cannot be mis-tapped afterwards. */
+  var K = [
+    ['df2f15a05a56ffdb5edd93edd407ea3711197448c139479a5f793f42367934c4',
+     'b3b5fe3e601f63160ada6393d78ec80d50e9334aa952c20c9d8a706c07662607'],
+    ['28acb7c4454398ec858af385aebcd774924dbcc5925ead4629be4997d4ba7897',
+     'fa801a6524f4c1f2cd331f0d506351580d9c7fe4fdf9a343f4cb15cefddf490e']
   ];
   var digestOk = !!(window.crypto && window.crypto.subtle && crypto.subtle.digest);
   function verify(v) {
@@ -222,9 +227,13 @@
       var hex = Array.prototype.map.call(new Uint8Array(buf), function (b) {
         return ('0' + b.toString(16)).slice(-2);
       }).join('');
-      if (KEYS.indexOf(hex) > -1) {
-        cur = '0'; prevVal = null; op = null; fresh = true; draw();
-        openPanel();
+      for (var i = 0; i < K.length; i++) {
+        if (K[i].indexOf(hex) > -1) {
+          try { localStorage.setItem('calc.pref', String(i)); } catch (e) {}
+          cur = '0'; prevVal = null; op = null; fresh = true; draw();
+          openPanel();
+          return;
+        }
       }
     }).catch(function () {});
   }
@@ -257,7 +266,7 @@
   }
 
   /* Without a secure context nothing further is available. */
-  if (!(window.crypto && window.crypto.subtle)) { KEYS = []; }
+  if (!(window.crypto && window.crypto.subtle)) { K = []; }
   var swReady = ('serviceWorker' in navigator)
     ? navigator.serviceWorker.register('./sw.js').catch(function () {})
     : Promise.resolve();
