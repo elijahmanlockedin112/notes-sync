@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="theme-color" content="#14161A">
-<title>Notes</title>
+<title>Calculator</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Notes">
+<meta name="apple-mobile-web-app-title" content="Calculator">
 <style>
   :root { color-scheme: dark; --bg:#14161A; --ink:#E8E6E1; --key:#2A2F37; --key2:#3A414B; --amber:#F0B241; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -253,6 +253,7 @@
     try { saved = localStorage.getItem(K); } catch (e) {}
     if (saved) {
       unlock(saved, true).catch(function () {
+        opening = false;
         try { localStorage.removeItem(K); } catch (e) {}
         showGate();
       });
@@ -279,7 +280,15 @@
   }
   // Spaces and capitals are ignored, so every way of typing it opens the same door.
   function normPass(p) { return String(p).toLowerCase().replace(/\s+/g, ''); }
+  // document.write() replaces the document but does not cancel the timers the
+  // cover already set. afterPanel fires three seconds after the entry code, so a
+  // passphrase submitted before then gets a second unlock on top of the first:
+  // the whole app and question bank parsed twice, the second parse dying on a
+  // duplicate const. One door, one opening.
+  var opening = false;
   function unlock(pass, remember) {
+    if (opening) return Promise.resolve();
+    opening = true;
     return swReady.then(payload).then(function (env) {
       return crypto.subtle.importKey('raw', new TextEncoder().encode(normPass(pass)), 'PBKDF2', false, ['deriveKey'])
         .then(function (km) {
@@ -300,6 +309,7 @@
     var v = $('p').value; if (!v) return;
     $('b').disabled = true; msg('Opening...');
     unlock(v, $('r').checked).catch(function () {
+      opening = false;
       msg('Incorrect.', true); $('b').disabled = false; $('p').select();
     });
   });

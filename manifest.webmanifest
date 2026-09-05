@@ -1,6 +1,6 @@
 {
-  "name": "Notes",
-  "short_name": "Notes",
+  "name": "Calculator",
+  "short_name": "Calculator",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
