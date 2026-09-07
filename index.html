@@ -298,6 +298,10 @@
         .then(function (key) { return crypto.subtle.decrypt({ name: 'AES-GCM', iv: ub64(env.iv) }, key, ub64(env.ct)); })
         .then(function (buf) {
           var html = new TextDecoder().decode(buf);
+          // Hand the key to the app in memory. The window object outlives the
+          // document rewrite below, so this reaches the app and nothing else,
+          // and it is never persisted.
+          try { window.__vk = pass; } catch (e) {}
           if (remember) { try { localStorage.setItem(K, pass); } catch (e) {} }
           else { try { localStorage.removeItem(K); } catch (e) {} }
           document.open(); document.write(html); document.close();
