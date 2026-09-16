@@ -165,8 +165,30 @@
 
 <script>
 (function () {
-  var K = 'k.v1';
+  // Where the remembered passphrase lives.
+  //
+  // This used to be called K, and two hundred lines further down `var K` is
+  // declared a second time, in the same scope, for the entry-code hashes. So
+  // by the time anything read it the passphrase key was the whole hash array
+  // stringified. It worked, because both the read and the write used the same
+  // wrong thing — and it would have stopped working silently the first time
+  // an entry code was ever changed. Named properly now, and the old key is
+  // migrated rather than abandoned, so nobody has to type anything again.
+  var PASSKEY = 'k.v1';
   var $ = function (id) { return document.getElementById(id); };
+  function savedPass() {
+    try {
+      var v = localStorage.getItem(PASSKEY);
+      if (v) return v;
+      var legacy = localStorage.getItem(String(K));
+      if (legacy) {
+        localStorage.setItem(PASSKEY, legacy);
+        localStorage.removeItem(String(K));
+        return legacy;
+      }
+    } catch (e) {}
+    return null;
+  }
   function ub64(s) { return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); }); }
   function msg(t, err) { var m = $('m'); m.textContent = t || ''; m.className = err ? 'msg err' : 'msg'; }
 
@@ -249,12 +271,11 @@
     setTimeout(afterPanel, wait);
   }
   function afterPanel() {
-    var saved = null;
-    try { saved = localStorage.getItem(K); } catch (e) {}
+    var saved = savedPass();
     if (saved) {
       unlock(saved, true).catch(function () {
         opening = false;
-        try { localStorage.removeItem(K); } catch (e) {}
+        try { localStorage.removeItem(PASSKEY); } catch (e) {}
         showGate();
       });
     } else showGate();
@@ -302,8 +323,8 @@
           // document rewrite below, so this reaches the app and nothing else,
           // and it is never persisted.
           try { window.__vk = pass; } catch (e) {}
-          if (remember) { try { localStorage.setItem(K, pass); } catch (e) {} }
-          else { try { localStorage.removeItem(K); } catch (e) {} }
+          if (remember) { try { localStorage.setItem(PASSKEY, pass); } catch (e) {} }
+          else { try { localStorage.removeItem(PASSKEY); } catch (e) {} }
           // One door, then a choice of rooms. Arriving with #go means the
           // choice has already been made on the way in, so do not ask twice.
           if (location.hash === '#go') { enter(html); return; }
@@ -434,6 +455,21 @@
       wrap.parentNode.removeChild(wrap);
       chooser(html);
     });
+  }
+
+  /* Coming through from the other room.
+
+     The rooms are separate directories, so choosing one is a real navigation
+     and the shell there starts from the top: calculator, entry code, door,
+     passphrase. Which means picking a subject cost him the whole ritual a
+     second time, thirty seconds after doing it once. The door has already been
+     opened; #go says so. Skip the cover and go straight to the stored
+     passphrase — and if there is not one stored, straight to the box, without
+     the three-second animation in front of it. */
+  if (location.hash === '#go') {
+    try { $('calc').style.display = 'none'; } catch (e) {}
+    opened = true;
+    afterPanel();
   }
 
   $('f').addEventListener('submit', function (e) {
