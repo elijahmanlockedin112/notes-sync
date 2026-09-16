@@ -434,11 +434,7 @@
     h.setAttribute('style', 'font-size:0.78rem;letter-spacing:0.09em;text-transform:uppercase;opacity:0.5;margin-bottom:0.8rem');
     h.textContent = 'What are you working on?';
     box.appendChild(h);
-    // The AI room is no longer offered here: it was disabled in the menu and
-    // could not be opened from it, and the AI account now reaches it directly.
-    ROOMS.filter(function (r) {
-      return r.id !== 'ai';
-    }).forEach(function (r) {
+    ROOMS.forEach(function (r) {
       // Whether a room exists yet is decided in the payload, not named here.
       var live = r.off ? false : true;
       var b = document.createElement('button');
@@ -457,7 +453,12 @@
       b.appendChild(t); b.appendChild(s);
       if (live) b.addEventListener('click', function () {
         if (r.id === 'all') { showAll(wrap, html); return; }
-        if ((r.dir != null ? r.dir : r.id) === MODE) { enter(html); return; }
+        // A room whose path is empty is this very page: the AI room on the AI
+        // shell, whose dir is '' while this shell's MODE is 'ai', so the dir
+        // test below never catches it. Open it in place. Falling through to
+        // '#go' with an empty path only set the hash and reloaded nothing,
+        // which is why the AI tile did nothing when clicked.
+        if (!r.path || (r.dir != null ? r.dir : r.id) === MODE) { enter(html); return; }
         location.href = r.path + '#go';
       });
       box.appendChild(b);
