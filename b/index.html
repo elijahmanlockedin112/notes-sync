@@ -414,6 +414,21 @@
       // without needing !important.
       html += '<style>body{border-top:3px solid ' + m.col + ' !important}</style>';
     }
+    // Keep the running app current without a manual refresh. The bundle is a
+    // static file with an ETag, so watch that: when a new one is deployed, the
+    // ETag changes and we reload straight back into the app via #go, which skips
+    // the entry code and the passphrase. Never mid-check, and never on the data
+    // sync (that touches the sync files, not app.enc). HEAD is not a GET, so the
+    // service worker passes it through to the network untouched.
+    html += '<scr'+'ipt>(function(){try{'
+      + 'var b=null,a=false;'
+      + 'function h(cb){fetch("./app.enc",{method:"HEAD",cache:"no-store"}).then(function(r){cb((r.headers.get("etag")||r.headers.get("last-modified")||"").trim());}).catch(function(){cb("");});}'
+      + 'function busy(){var q=document.getElementById("quiz-run"),r=document.getElementById("quiz-result");return !!((q&&!q.hidden)||(r&&!r.hidden));}'
+      + 'function ck(){if(!a||!b||busy())return;h(function(v){if(v&&v!==b){try{if(location.hash!=="#go")location.hash="#go";}catch(e){}location.reload();}});}'
+      + 'h(function(v){b=v;a=true;});'
+      + 'setInterval(ck,120000);'
+      + 'document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")ck();});'
+      + '}catch(e){}})();</scr'+'ipt>';
     document.open(); document.write(html); document.close();
   }
   function chooser(html) {
