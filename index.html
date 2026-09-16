@@ -363,16 +363,23 @@
     if (!m) return;
     try {
       var j = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+      // A room's DIRECTORY and its NAME are deliberately different things.
+      // The directory is in the URL and in this file, both of which are public;
+      // the name is not. So this file knows only that it is sitting in a folder
+      // called "b", and what "b" is for arrives with the decrypted config.
+      //
+      // (The first draft of this very comment named the subject out loud, and
+      // the builder refused to write the file. Working as intended.)
       ROOMS = (j.rooms || []).map(function (r) {
-        return { id: r.id, label: r.label, sub: r.sub, col: r.col,
-          path: r.id === 'ai' ? UP : (r.path ? UP + r.path : null), off: r.off };
+        return { id: r.id, dir: r.dir, label: r.label, sub: r.sub, col: r.col,
+          path: r.path ? UP + r.path : UP, off: r.off };
       });
       EVENTS = j.events || [];
     } catch (e) { ROOMS = []; EVENTS = []; }
   }
   function enter(html, mode) {
     readCfg(html);
-    var m = ROOMS.filter(function (r) { return r.id === (mode || MODE); })[0];
+    var m = ROOMS.filter(function (r) { return (r.dir != null ? r.dir : r.id) === (mode || MODE); })[0];
     if (m) {
       // A stripe the app itself never has to know about.
       //
@@ -417,7 +424,7 @@
       b.appendChild(t); b.appendChild(s);
       if (live) b.addEventListener('click', function () {
         if (r.id === 'all') { showAll(wrap, html); return; }
-        if (r.id === MODE) { enter(html); return; }
+        if ((r.dir != null ? r.dir : r.id) === MODE) { enter(html); return; }
         location.href = r.path + '#go';
       });
       box.appendChild(b);
