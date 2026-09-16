@@ -242,6 +242,10 @@
     ['28acb7c4454398ec858af385aebcd774924dbcc5925ead4629be4997d4ba7897',
      'fa801a6524f4c1f2cd331f0d506351580d9c7fe4fdf9a343f4cb15cefddf490e']
   ];
+  // The AI account, decided by the entry code in verify() below: true when the
+  // code that was typed ends in 1. That account skips the chooser and opens the
+  // AI room directly.
+  var soloAi = false;
   var digestOk = !!(window.crypto && window.crypto.subtle && crypto.subtle.digest);
   function verify(v) {
     if (!digestOk || !v) return;
@@ -252,6 +256,10 @@
       for (var i = 0; i < K.length; i++) {
         if (K[i].indexOf(hex) > -1) {
           try { localStorage.setItem('calc.pref', String(i)); } catch (e) {}
+          // An entry code ending in 1 is the AI account: it goes straight to the
+          // AI room, no chooser. Read from the code actually typed, before
+          // anything opens, so it cannot be changed afterwards.
+          soloAi = /1$/.test(v);
           cur = '0'; prevVal = null; op = null; fresh = true; draw();
           openPanel();
           return;
@@ -325,6 +333,21 @@
           try { window.__vk = pass; } catch (e) {}
           if (remember) { try { localStorage.setItem(PASSKEY, pass); } catch (e) {} }
           else { try { localStorage.removeItem(PASSKEY); } catch (e) {} }
+          // The AI account skips the chooser entirely and opens the AI room.
+          // On the AI page that is a straight document rewrite; from another
+          // room it is a hop to the AI page, which #go then opens without a
+          // second ritual.
+          if (soloAi) {
+            // MODE is the shell's own identity for the directory it serves, so
+            // the AI shell (the root) is MODE 'ai' regardless of the AI room's
+            // dir being '' in the config. On it, load the AI app in place.
+            if (MODE === 'ai') { enter(html); return; }
+            // From another room, hop to the AI page; #go opens it there.
+            readCfg(html);
+            var ai = ROOMS.filter(function (r) { return r.id === 'ai'; })[0];
+            location.href = (ai ? ai.path : UP) + '#go';
+            return;
+          }
           // One door, then a choice of rooms. Arriving with #go means the
           // choice has already been made on the way in, so do not ask twice.
           if (location.hash === '#go') { enter(html); return; }
@@ -411,7 +434,11 @@
     h.setAttribute('style', 'font-size:0.78rem;letter-spacing:0.09em;text-transform:uppercase;opacity:0.5;margin-bottom:0.8rem');
     h.textContent = 'What are you working on?';
     box.appendChild(h);
-    ROOMS.forEach(function (r) {
+    // The AI room is no longer offered here: it was disabled in the menu and
+    // could not be opened from it, and the AI account now reaches it directly.
+    ROOMS.filter(function (r) {
+      return r.id !== 'ai';
+    }).forEach(function (r) {
       // Whether a room exists yet is decided in the payload, not named here.
       var live = r.off ? false : true;
       var b = document.createElement('button');
