@@ -356,7 +356,7 @@
      So the rooms travel inside the ciphertext. Nothing below is known until a
      correct passphrase has decrypted the payload. */
   var MODE = 'ai', UP = '';
-  var ROOMS = [], EVENTS = [];
+  var ROOMS = [], EVENTS = [], RHYTHM = null;
   function readCfg(html) {
     if (ROOMS.length) return;
     var m = html.match(/<!--R:([A-Za-z0-9+/=]+)-->/);
@@ -375,7 +375,8 @@
           path: r.path ? UP + r.path : UP, off: r.off };
       });
       EVENTS = j.events || [];
-    } catch (e) { ROOMS = []; EVENTS = []; }
+      RHYTHM = j.rhythm || null;
+    } catch (e) { ROOMS = []; EVENTS = []; RHYTHM = null; }
   }
   function enter(html, mode) {
     readCfg(html);
@@ -396,11 +397,16 @@
     readCfg(html);
     if (!ROOMS.length) { enter(html); return; }   // nothing to choose between
     var wrap = document.createElement('div');
+    // Centred with `margin:auto` on the child rather than `align-items:center`
+    // on the parent. They look identical until the content is taller than the
+    // screen, at which point centring from the parent clips the top off and
+    // refuses to scroll to it — which is exactly what the week rhythm did to
+    // this panel on a phone.
     wrap.setAttribute('style', 'position:fixed;inset:0;z-index:99;background:#0d1117;color:#e6edf3;' +
-      'display:flex;align-items:center;justify-content:center;padding:1.2rem;' +
+      'display:flex;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:1.2rem;' +
       'font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif');
     var box = document.createElement('div');
-    box.setAttribute('style', 'width:100%;max-width:30rem');
+    box.setAttribute('style', 'width:100%;max-width:30rem;margin:auto');
     var h = document.createElement('div');
     h.setAttribute('style', 'font-size:0.78rem;letter-spacing:0.09em;text-transform:uppercase;opacity:0.5;margin-bottom:0.8rem');
     h.textContent = 'What are you working on?';
@@ -439,7 +445,62 @@
     var DAY = 864e5;
     var EV = EVENTS;                              // from the ciphertext, never from this file
     var now = new Date();
-    var html2 = '<div style="font-size:0.78rem;letter-spacing:0.09em;text-transform:uppercase;opacity:0.5;margin-bottom:0.9rem">Everything, by date</div>';
+    var html2 = '';
+
+    // Which one to open tonight.
+    //
+    // Every app answers "what next" inside its own subject and none of them
+    // answers this, which is the only question that exists once three are
+    // running. It leads because it is the one thing here that is actionable
+    // within the next hour; the countdowns below are context, not instructions.
+    var RH = RHYTHM;
+    if (RH && RH.days) {
+      var colOf = function (id) {
+        var r = ROOMS.filter(function (x) { return x.id === id; })[0];
+        return r ? r.col : '#8b949e';
+      };
+      var labOf = function (id) {
+        var r = ROOMS.filter(function (x) { return x.id === id; })[0];
+        return r ? r.label : 'Either';
+      };
+      var today = RH.days.filter(function (x) { return x.d === now.getDay(); })[0];
+      var iso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+      var phase = (RH.phases || []).filter(function (p) { return p[0] >= iso; })[0];
+
+      html2 += '<div style="font-size:0.78rem;letter-spacing:0.09em;text-transform:uppercase;opacity:0.5;margin-bottom:0.6rem">Tonight</div>';
+      if (RH.daily) {
+        html2 += '<div style="display:flex;justify-content:space-between;gap:0.8rem;padding:0.6rem 0.9rem;' +
+          'margin-bottom:0.5rem;border-radius:9px;background:#161b22;border-left:5px solid ' + colOf(RH.daily.room) + '">' +
+          '<span><b style="color:' + colOf(RH.daily.room) + '">Every day &middot; ' + RH.daily.what + '</b>' +
+          '<br><span style="font-size:0.78rem;opacity:0.6">' + RH.daily.why + '</span></span>' +
+          '<span style="font-size:0.85rem;opacity:0.6;white-space:nowrap">' + RH.daily.mins + ' min</span></div>';
+      }
+      if (today) {
+        html2 += '<div style="display:flex;justify-content:space-between;gap:0.8rem;padding:0.8rem 0.9rem;' +
+          'margin-bottom:0.5rem;border-radius:9px;background:#1c2128;border:1px solid ' + colOf(today.room) + ';' +
+          'border-left:5px solid ' + colOf(today.room) + '">' +
+          '<span><b style="color:' + colOf(today.room) + ';font-size:1.05rem">' + labOf(today.room) + '</b>' +
+          '<br><span style="font-size:0.85rem;opacity:0.75">' + today.what + '</span></span>' +
+          '<span style="font-size:0.85rem;opacity:0.6;white-space:nowrap">' + today.mins + ' min</span></div>';
+      }
+      if (phase) html2 += '<div style="font-size:0.8rem;opacity:0.62;margin:0 0 1rem">' + phase[1] + '</div>';
+
+      // The rest of the week, so it reads as a shape rather than a nag.
+      html2 += '<div style="font-size:0.78rem;letter-spacing:0.09em;text-transform:uppercase;opacity:0.5;margin-bottom:0.5rem">The week</div>';
+      var NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      RH.days.forEach(function (x) {
+        var is = x.d === now.getDay();
+        html2 += '<div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.3rem 0.5rem;border-radius:6px;' +
+          (is ? 'background:#161b22;' : '') + 'font-size:0.85rem;opacity:' + (is ? '1' : '0.62') + '">' +
+          '<span style="width:2.4rem;opacity:0.7">' + NAMES[x.d] + '</span>' +
+          '<span style="width:0.55rem;height:0.55rem;border-radius:50%;background:' + colOf(x.room) + ';flex:0 0 auto"></span>' +
+          '<span style="flex:1">' + x.what + '</span>' +
+          '<span style="opacity:0.55;white-space:nowrap">' + x.mins + '′</span></div>';
+      });
+      if (RH.note) html2 += '<div style="font-size:0.78rem;opacity:0.5;margin:0.7rem 0 1.2rem">' + RH.note + '</div>';
+    }
+
+    html2 += '<div style="font-size:0.78rem;letter-spacing:0.09em;text-transform:uppercase;opacity:0.5;margin-bottom:0.9rem">Everything, by date</div>';
     EV.forEach(function (e) {
       var d = Math.ceil((new Date(e[1] + 'T00:00:00') - now) / DAY);
       html2 += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.8rem;' +
