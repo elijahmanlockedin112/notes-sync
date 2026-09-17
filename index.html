@@ -414,20 +414,27 @@
       // without needing !important.
       html += '<style>body{border-top:3px solid ' + m.col + ' !important}</style>';
     }
-    // Keep the running app current without a manual refresh. The bundle is a
-    // static file with an ETag, so watch that: when a new one is deployed, the
-    // ETag changes and we reload straight back into the app via #go, which skips
-    // the entry code and the passphrase. Never mid-check, and never on the data
-    // sync (that touches the sync files, not app.enc). HEAD is not a GET, so the
-    // service worker passes it through to the network untouched.
+    // Two things injected into the running app. First, keep it current without a
+    // manual refresh: the bundle is a static file with an ETag, so when a new one
+    // is deployed the ETag changes and we reload straight back in via #go (which
+    // skips the entry code and passphrase), never mid-check, never on the data
+    // sync. HEAD is not a GET, so the service worker passes the probe through.
+    // Second, hide-to-calculator: a per-device toggle in the account rail (on by
+    // default). When on, backgrounding or closing the app reloads WITHOUT #go,
+    // which lands on the calculator and asks for the entry code again on return —
+    // so the app switcher and the next open show a calculator, not the study app.
     html += '<scr'+'ipt>(function(){try{'
-      + 'var b=null,a=false;'
+      + 'var b=null,a=false,updating=false,leaving=false;'
       + 'function h(cb){fetch("./app.enc",{method:"HEAD",cache:"no-store"}).then(function(r){cb((r.headers.get("etag")||r.headers.get("last-modified")||"").trim());}).catch(function(){cb("");});}'
       + 'function busy(){var q=document.getElementById("quiz-run"),r=document.getElementById("quiz-result");return !!((q&&!q.hidden)||(r&&!r.hidden));}'
-      + 'function ck(){if(!a||!b||busy())return;h(function(v){if(v&&v!==b){try{if(location.hash!=="#go")location.hash="#go";}catch(e){}location.reload();}});}'
+      + 'function ck(){if(!a||!b||busy())return;h(function(v){if(v&&v!==b){updating=true;try{if(location.hash!=="#go")location.hash="#go";}catch(e){}location.reload();}});}'
       + 'h(function(v){b=v;a=true;});'
       + 'setInterval(ck,120000);'
-      + 'document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")ck();});'
+      + 'function locked(){try{return localStorage.getItem("calc.lockOnLeave")!=="0";}catch(e){return true;}}'
+      + 'function toCalc(){if(leaving||updating||!locked())return;leaving=true;try{location.replace(location.pathname+location.search);}catch(e){try{location.href=location.pathname;}catch(_){}}}'
+      + 'try{var rail=document.querySelector(".acct");if(rail&&!document.getElementById("lock-leave")){var lb=document.createElement("label");lb.className="tiny muted";lb.setAttribute("style","display:flex;gap:0.45rem;align-items:center;margin-top:0.5rem;cursor:pointer");var ci=document.createElement("input");ci.type="checkbox";ci.id="lock-leave";ci.setAttribute("style","width:auto;flex:none;margin:0");ci.checked=locked();ci.addEventListener("change",function(){try{localStorage.setItem("calc.lockOnLeave",ci.checked?"1":"0");}catch(e){}});lb.appendChild(ci);lb.appendChild(document.createTextNode(" Hide to the calculator when the app is closed"));rail.appendChild(lb);}}catch(e){}'
+      + 'document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")ck();else if(document.visibilityState==="hidden")toCalc();});'
+      + 'window.addEventListener("pagehide",function(){toCalc();});'
       + '}catch(e){}})();</scr'+'ipt>';
     document.open(); document.write(html); document.close();
   }
