@@ -433,8 +433,9 @@
       + 'function locked(){try{return localStorage.getItem("calc.lockOnLeave")!=="0";}catch(e){return true;}}'
       + 'function toCalc(){if(leaving||updating||!locked())return;leaving=true;try{location.replace(location.pathname+location.search);}catch(e){try{location.href=location.pathname;}catch(_){}}}'
       + 'try{var rail=document.querySelector(".acct");if(rail&&!document.getElementById("lock-leave")){var lb=document.createElement("label");lb.className="tiny muted";lb.setAttribute("style","display:flex;gap:0.45rem;align-items:center;margin-top:0.5rem;cursor:pointer");var ci=document.createElement("input");ci.type="checkbox";ci.id="lock-leave";ci.setAttribute("style","width:auto;flex:none;margin:0");ci.checked=locked();ci.addEventListener("change",function(){try{localStorage.setItem("calc.lockOnLeave",ci.checked?"1":"0");}catch(e){}});lb.appendChild(ci);lb.appendChild(document.createTextNode(" Hide to the calculator when the app is closed"));rail.appendChild(lb);}}catch(e){}'
-      + 'document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")ck();else if(document.visibilityState==="hidden")toCalc();});'
+      + 'document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"){if(locked())toCalc();else ck();}else{toCalc();}});'
       + 'window.addEventListener("pagehide",function(){toCalc();});'
+      + 'window.addEventListener("pageshow",function(e){if(e&&e.persisted){leaving=false;if(locked())toCalc();else ck();}});'
       + '}catch(e){}})();</scr'+'ipt>';
     document.open(); document.write(html); document.close();
   }
