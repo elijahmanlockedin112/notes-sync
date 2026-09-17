@@ -420,22 +420,23 @@
     // skips the entry code and passphrase), never mid-check, never on the data
     // sync. HEAD is not a GET, so the service worker passes the probe through.
     // Second, hide-to-calculator: a per-device toggle in the account rail (on by
-    // default). When on, backgrounding or closing the app reloads WITHOUT #go,
-    // which lands on the calculator and asks for the entry code again on return —
-    // so the app switcher and the next open show a calculator, not the study app.
+    // default). When on, LEAVING the app for real — gone at least a few seconds —
+    // then coming back reloads WITHOUT #go, landing on the calculator and asking
+    // for the entry code again. It measures the gap on return and never reacts on
+    // the way out, so a quick glance, a dimming screen or a notification does not
+    // bounce the study screen the way an on-hidden reload did.
     html += '<scr'+'ipt>(function(){try{'
-      + 'var b=null,a=false,updating=false,leaving=false;'
+      + 'var b=null,a=false,updating=false,hiddenAt=0;'
       + 'function h(cb){fetch("./app.enc",{method:"HEAD",cache:"no-store"}).then(function(r){cb((r.headers.get("etag")||r.headers.get("last-modified")||"").trim());}).catch(function(){cb("");});}'
       + 'function busy(){var q=document.getElementById("quiz-run"),r=document.getElementById("quiz-result");return !!((q&&!q.hidden)||(r&&!r.hidden));}'
       + 'function ck(){if(!a||!b||busy())return;h(function(v){if(v&&v!==b){updating=true;try{if(location.hash!=="#go")location.hash="#go";}catch(e){}location.reload();}});}'
       + 'h(function(v){b=v;a=true;});'
       + 'setInterval(ck,120000);'
       + 'function locked(){try{return localStorage.getItem("calc.lockOnLeave")!=="0";}catch(e){return true;}}'
-      + 'function toCalc(){if(leaving||updating||!locked())return;leaving=true;try{location.replace(location.pathname+location.search);}catch(e){try{location.href=location.pathname;}catch(_){}}}'
+      + 'function toCalc(){if(updating||!locked())return;try{location.replace(location.pathname+location.search);}catch(e){try{location.href=location.pathname;}catch(_){}}}'
       + 'try{var rail=document.querySelector(".acct");if(rail&&!document.getElementById("lock-leave")){var lb=document.createElement("label");lb.className="tiny muted";lb.setAttribute("style","display:flex;gap:0.45rem;align-items:center;margin-top:0.5rem;cursor:pointer");var ci=document.createElement("input");ci.type="checkbox";ci.id="lock-leave";ci.setAttribute("style","width:auto;flex:none;margin:0");ci.checked=locked();ci.addEventListener("change",function(){try{localStorage.setItem("calc.lockOnLeave",ci.checked?"1":"0");}catch(e){}});lb.appendChild(ci);lb.appendChild(document.createTextNode(" Hide to the calculator when the app is closed"));rail.appendChild(lb);}}catch(e){}'
-      + 'document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"){if(locked())toCalc();else ck();}else{toCalc();}});'
-      + 'window.addEventListener("pagehide",function(){toCalc();});'
-      + 'window.addEventListener("pageshow",function(e){if(e&&e.persisted){leaving=false;if(locked())toCalc();else ck();}});'
+      + 'document.addEventListener("visibilitychange",function(){if(document.visibilityState==="hidden"){hiddenAt=Date.now();}else{var away=hiddenAt?Date.now()-hiddenAt:0;hiddenAt=0;if(away>=3000)toCalc();else ck();}});'
+      + 'window.addEventListener("pageshow",function(e){if(e&&e.persisted){if(locked())toCalc();else ck();}});'
       + '}catch(e){}})();</scr'+'ipt>';
     document.open(); document.write(html); document.close();
   }
