@@ -356,7 +356,13 @@
      So the rooms travel inside the ciphertext. Nothing below is known until a
      correct passphrase has decrypted the payload. */
   var MODE = 'ai', UP = '';
-  var ROOMS = [], EVENTS = [], RHYTHM = null;
+  var ROOMS = [], EVENTS = [], RHYTHM = null, SOLO = null;
+  // Which account slot the entry code selected. The cover writes this before
+  // anything opens, so it is known this early; what a slot MEANS is not in
+  // this file.
+  function slotNow() {
+    try { return localStorage.getItem('calc.pref'); } catch (e) { return null; }
+  }
   function readCfg(html) {
     if (ROOMS.length) return;
     var m = html.match(/<!--R:([A-Za-z0-9+/=]+)-->/);
@@ -376,7 +382,8 @@
       });
       EVENTS = j.events || [];
       RHYTHM = j.rhythm || null;
-    } catch (e) { ROOMS = []; EVENTS = []; RHYTHM = null; }
+      SOLO = j.solo || null;
+    } catch (e) { ROOMS = []; EVENTS = []; RHYTHM = null; SOLO = null; }
   }
   function enter(html, mode) {
     readCfg(html);
@@ -395,7 +402,18 @@
   }
   function chooser(html) {
     readCfg(html);
-    if (!ROOMS.length) { enter(html); return; }   // nothing to choose between
+    if (!ROOMS.length) { enter(html); return; }
+    // An account with only one subject goes straight there. No menu, no
+    // sight of the other two, and nothing to pick wrong at eight in the
+    // evening.
+    if (SOLO && slotNow() === SOLO.slot) {
+      var only = ROOMS.filter(function (r) { return r.id === SOLO.room; })[0];
+      if (only) {
+        if ((only.dir != null ? only.dir : only.id) === MODE) { enter(html, only.id); return; }
+        location.href = only.path + '#go';
+        return;
+      }
+    }   // nothing to choose between
     var wrap = document.createElement('div');
     // Centred with `margin:auto` on the child rather than `align-items:center`
     // on the parent. They look identical until the content is taller than the
