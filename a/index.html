@@ -242,10 +242,6 @@
     ['28acb7c4454398ec858af385aebcd774924dbcc5925ead4629be4997d4ba7897',
      'fa801a6524f4c1f2cd331f0d506351580d9c7fe4fdf9a343f4cb15cefddf490e']
   ];
-  // The AI account, decided by the entry code in verify() below: true when the
-  // code that was typed ends in 1. That account skips the chooser and opens the
-  // AI room directly.
-  var soloAi = false;
   var digestOk = !!(window.crypto && window.crypto.subtle && crypto.subtle.digest);
   function verify(v) {
     if (!digestOk || !v) return;
@@ -256,10 +252,6 @@
       for (var i = 0; i < K.length; i++) {
         if (K[i].indexOf(hex) > -1) {
           try { localStorage.setItem('calc.pref', String(i)); } catch (e) {}
-          // An entry code ending in 1 is the AI account: it goes straight to the
-          // AI room, no chooser. Read from the code actually typed, before
-          // anything opens, so it cannot be changed afterwards.
-          soloAi = /1$/.test(v);
           cur = '0'; prevVal = null; op = null; fresh = true; draw();
           openPanel();
           return;
@@ -333,21 +325,6 @@
           try { window.__vk = pass; } catch (e) {}
           if (remember) { try { localStorage.setItem(PASSKEY, pass); } catch (e) {} }
           else { try { localStorage.removeItem(PASSKEY); } catch (e) {} }
-          // The AI account skips the chooser entirely and opens the AI room.
-          // On the AI page that is a straight document rewrite; from another
-          // room it is a hop to the AI page, which #go then opens without a
-          // second ritual.
-          if (soloAi) {
-            // MODE is the shell's own identity for the directory it serves, so
-            // the AI shell (the root) is MODE 'ai' regardless of the AI room's
-            // dir being '' in the config. On it, load the AI app in place.
-            if (MODE === 'ai') { enter(html); return; }
-            // From another room, hop to the AI page; #go opens it there.
-            readCfg(html);
-            var ai = ROOMS.filter(function (r) { return r.id === 'ai'; })[0];
-            location.href = (ai ? ai.path : UP) + '#go';
-            return;
-          }
           // One door, then a choice of rooms. Arriving with #go means the
           // choice has already been made on the way in, so do not ask twice.
           if (location.hash === '#go') { enter(html); return; }
@@ -414,30 +391,6 @@
       // without needing !important.
       html += '<style>body{border-top:3px solid ' + m.col + ' !important}</style>';
     }
-    // Two things injected into the running app. First, keep it current without a
-    // manual refresh: the bundle is a static file with an ETag, so when a new one
-    // is deployed the ETag changes and we reload straight back in via #go (which
-    // skips the entry code and passphrase), never mid-check, never on the data
-    // sync. HEAD is not a GET, so the service worker passes the probe through.
-    // Second, hide-to-calculator: a per-device toggle in the account rail (on by
-    // default). When on, LEAVING the app for real — gone at least a few seconds —
-    // then coming back reloads WITHOUT #go, landing on the calculator and asking
-    // for the entry code again. It measures the gap on return and never reacts on
-    // the way out, so a quick glance, a dimming screen or a notification does not
-    // bounce the study screen the way an on-hidden reload did.
-    html += '<scr'+'ipt>(function(){try{'
-      + 'var b=null,a=false,updating=false,hiddenAt=0;'
-      + 'function h(cb){fetch("./app.enc",{method:"HEAD",cache:"no-store"}).then(function(r){cb((r.headers.get("etag")||r.headers.get("last-modified")||"").trim());}).catch(function(){cb("");});}'
-      + 'function busy(){var q=document.getElementById("quiz-run"),r=document.getElementById("quiz-result");return !!((q&&!q.hidden)||(r&&!r.hidden));}'
-      + 'function ck(){if(!a||!b||busy())return;h(function(v){if(v&&v!==b){updating=true;try{if(location.hash!=="#go")location.hash="#go";}catch(e){}location.reload();}});}'
-      + 'h(function(v){b=v;a=true;});'
-      + 'setInterval(ck,120000);'
-      + 'function locked(){try{return localStorage.getItem("calc.lockOnLeave")!=="0";}catch(e){return true;}}'
-      + 'function toCalc(){if(updating||!locked())return;try{location.replace(location.pathname+location.search);}catch(e){try{location.href=location.pathname;}catch(_){}}}'
-      + 'try{var rail=document.querySelector(".acct");if(rail&&!document.getElementById("lock-leave")){var lb=document.createElement("label");lb.className="tiny muted";lb.setAttribute("style","display:flex;gap:0.45rem;align-items:center;margin-top:0.5rem;cursor:pointer");var ci=document.createElement("input");ci.type="checkbox";ci.id="lock-leave";ci.setAttribute("style","width:auto;flex:none;margin:0");ci.checked=locked();ci.addEventListener("change",function(){try{localStorage.setItem("calc.lockOnLeave",ci.checked?"1":"0");}catch(e){}});lb.appendChild(ci);lb.appendChild(document.createTextNode(" Hide to the calculator when the app is closed"));rail.appendChild(lb);}}catch(e){}'
-      + 'document.addEventListener("visibilitychange",function(){if(document.visibilityState==="hidden"){hiddenAt=Date.now();}else{var away=hiddenAt?Date.now()-hiddenAt:0;hiddenAt=0;if(away>=3000)toCalc();else ck();}});'
-      + 'window.addEventListener("pageshow",function(e){if(e&&e.persisted){if(locked())toCalc();else ck();}});'
-      + '}catch(e){}})();</scr'+'ipt>';
     document.open(); document.write(html); document.close();
   }
   function chooser(html) {
@@ -477,12 +430,7 @@
       b.appendChild(t); b.appendChild(s);
       if (live) b.addEventListener('click', function () {
         if (r.id === 'all') { showAll(wrap, html); return; }
-        // A room whose path is empty is this very page: the AI room on the AI
-        // shell, whose dir is '' while this shell's MODE is 'ai', so the dir
-        // test below never catches it. Open it in place. Falling through to
-        // '#go' with an empty path only set the hash and reloaded nothing,
-        // which is why the AI tile did nothing when clicked.
-        if (!r.path || (r.dir != null ? r.dir : r.id) === MODE) { enter(html); return; }
+        if ((r.dir != null ? r.dir : r.id) === MODE) { enter(html); return; }
         location.href = r.path + '#go';
       });
       box.appendChild(b);
