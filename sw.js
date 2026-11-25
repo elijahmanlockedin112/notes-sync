@@ -1,4 +1,4 @@
-const CACHE = 'c-mwwke6hk';
+const CACHE = 'c-mwwktpzi';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png', './app.enc'];
 // The dressed Pip the app draws for Pip's reminders (see pipFaceSave in the app). Kept across updates.
 const FACE_CACHE = 'pip-face';
