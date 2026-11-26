@@ -408,7 +408,7 @@
     // An account with only one subject goes straight there. No menu, no
     // sight of the other two, and nothing to pick wrong at eight in the
     // evening.
-    if (SOLO && slotNow() === SOLO.slot) {
+    if (SOLO && [].concat(SOLO.slot).indexOf(slotNow()) > -1) {
       var only = ROOMS.filter(function (r) { return r.id === SOLO.room; })[0];
       if (only) {
         if ((only.dir != null ? only.dir : only.id) === MODE) { enter(html, only.id); return; }
