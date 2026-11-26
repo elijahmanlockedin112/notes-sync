@@ -323,6 +323,8 @@
           // document rewrite below, so this reaches the app and nothing else,
           // and it is never persisted.
           try { window.__vk = pass; } catch (e) {}
+          // Arrived from a setup link: say which account it set up, in memory, the same way.
+          if (setupWho) { try { window.__setup = setupWho; } catch (e) {} }
           if (remember) { try { localStorage.setItem(PASSKEY, pass); } catch (e) {} }
           else { try { localStorage.removeItem(PASSKEY); } catch (e) {} }
           // One door, then a choice of rooms. Arriving with #go means the
@@ -552,6 +554,43 @@
      opened; #go says so. Skip the cover and go straight to the stored
      passphrase — and if there is not one stored, straight to the box, without
      the three-second animation in front of it. */
+  /* A setup link, from the setup QR: #setup=<base64url of {"k": passphrase, "who": "A" or "E"}>.
+     A fragment never reaches the server. It is read once and wiped from the address bar and the
+     history at once, then the door opens with it exactly as if it had been typed with "Stay
+     unlocked" ticked, on the account the link names. A link that can't be read, or whose
+     passphrase doesn't open the door, lands on the ordinary box with a short note. */
+  var setupWho = null;
+  function setupBad() {
+    try { $('calc').style.display = 'none'; } catch (e) {}
+    opened = true;
+    showGate();
+    msg('That setup link didn’t work. Type the passphrase instead.', true);
+  }
+  (function () {
+    var m = /(?:^#|&)setup=([A-Za-z0-9_\-+/]+={0,2})/.exec(location.hash || '');
+    if (!m) return;
+    try { history.replaceState(null, '', location.pathname + location.search); }
+    catch (e) { try { location.hash = ''; } catch (e2) {} }
+    var j = null;
+    try {
+      var s = m[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (s.length % 4) s += '=';
+      j = JSON.parse(decodeURIComponent(escape(atob(s))));
+    } catch (e) { j = null; }
+    var who = j && (j.who === 'A' || j.who === 'E') ? j.who : null;
+    if (!j || typeof j.k !== 'string' || !j.k || !who) { setupBad(); return; }
+    // The slot the entry code would have picked for this account.
+    try { localStorage.setItem('calc.pref', who === 'A' ? '0' : '1'); } catch (e) {}
+    try { $('calc').style.display = 'none'; } catch (e) {}
+    opened = true;
+    setupWho = who;
+    var k = j.k; j = null;
+    unlock(k, true).catch(function () { opening = false; setupWho = null; setupBad(); });
+  })();
+  // A setup link opened over a page that is already showing only changes the fragment, which loads
+  // nothing. Start over so the link is read like a fresh open.
+  window.addEventListener('hashchange', function () { if (/(?:^#|&)setup=/.test(location.hash)) location.reload(); });
+
   if (location.hash === '#go') {
     try { $('calc').style.display = 'none'; } catch (e) {}
     opened = true;
